@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dev Concerns Checklist</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<h2>Dev Concerns Checklist</h2>
+
+<div style="margin-bottom: 10px;">
+  <button id="addTableBtn" class="btn-add-table">
+    <span class="btn-icon">➕</span> Add Table
+  </button>
+  <button id="saveTablesBtn" style="margin-left: 15px; background: #007bff; color: white;">Save All</button>
+</div>
+
+<div id="tablesContainer">
+  <!-- Tables will be dynamically generated here -->
+</div>
+
+<!-- Firebase -->
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics-compat.js"></script>
+
+<script src="main.js"></script>
+</body>
+</html>

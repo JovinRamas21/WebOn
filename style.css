@@ -1,0 +1,164 @@
+body {
+  font-family: Arial, sans-serif;
+  margin: 0px;
+}
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 1200px;
+}
+
+th, td {
+  border: 1px solid #ccc;
+  text-align: center;
+  padding: 5px;
+  font-size: 12px;
+}
+
+th {
+  background-color: #0047AB;
+  color: white;
+  position: static;
+  top: 0;
+  z-index: 2;
+}
+
+.group-header {
+  color: white;
+  font-weight: bold;
+}
+
+.keppel { background-color: #00ff4c; } /* light green */
+.talisay { background-color: #00ff4c; }
+.probationary { background-color: #ff0000; color: white; }
+
+.checkbox-cell input[type="checkbox"] {
+  transform: scale(1.2);
+}
+
+.errors {
+  font-weight: bold;
+  color: white;
+  font-size: small;
+}
+
+.errors.low { background-color: black; }
+.errors.medium { background-color: darkred; }
+.errors.high { background-color: red; }
+
+tfoot td {
+  font-weight: bold;
+  font-size: small;
+  background-color: #f3f3f3;
+}
+
+.column-total {
+  color: #d32f2f;
+}
+
+.grand-total {
+  color: #000;
+}
+
+h2 {
+    text-align: center;
+}
+
+.checkbox-cell {
+  position: relative;
+}
+
+.comment-box {
+  position: absolute;
+  top: 50%;
+  left: 110%;
+  transform: translateY(-50%);
+  width: 240px;        /* bigger width */
+  min-height: 80px;   /* more typing space */
+  padding: 8px;
+  font-size: 12px;
+  display: none;
+  border: 1px solid #ccc;
+  background: #fff;
+  z-index: 20;
+  resize: vertical;   /* allow resize if needed */
+  box-shadow: 0 3px 8px rgba(0,0,0,0.18);
+}
+
+/* Show on hover */
+.checkbox-cell:hover .comment-box {
+  display: block;
+}
+
+/* Comment indicator */
+.has-comment::after {
+  content: "💬";
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  font-size: 25px;
+}
+
+/* Button Base */
+.btn-add-table {
+  margin-left: 15px;
+  padding: 12px 24px;
+  background: linear-gradient(135deg, #4CAF50, #45a049);
+  color: white;
+  font-weight: bold;
+  font-size: 16px;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 5px 10px rgba(0,0,0,0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Icon animation */
+.btn-icon {
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+
+/* Hover effect */
+.btn-add-table:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 12px rgba(0,0,0,0.2);
+}
+
+/* Icon rotate on hover */
+.btn-add-table:hover .btn-icon {
+  transform: rotate(90deg);
+}
+
+/* Click (active) effect */
+.btn-add-table:active {
+  transform: scale(0.95);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.15);
+}
+
+/* Ripple effect */
+.btn-add-table::after {
+  content: '';
+  position: absolute;
+  background: rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  transform: scale(0);
+  width: 100px;
+  height: 100px;
+  opacity: 0;
+  pointer-events: none;
+  transition: transform 0.5s, opacity 1s;
+}
+
+.btn-add-table:active::after {
+  transform: scale(2);
+  opacity: 1;
+  transition: 0s;
+}
