@@ -1,11 +1,13 @@
 // =======================
 // Firebase
 // =======================
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyD2i8d1usAifaTvqkNzgylOLU2XDtakAUk",
   authDomain: "webcon-concerns.firebaseapp.com",
+  databaseURL: "https://webcon-concerns-default-rtdb.firebaseio.com",
   projectId: "webcon-concerns",
-  storageBucket: "webcon-concerns.appspot.com",
+  storageBucket: "webcon-concerns.firebasestorage.app",
   messagingSenderId: "416233156932",
   appId: "1:416233156932:web:78a1dfce6c61cf030f2711",
   measurementId: "G-L6LFLKHP6P"
