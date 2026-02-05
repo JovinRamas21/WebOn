@@ -14,13 +14,13 @@ const firebaseConfig = {
 
 // Initialize Firebase
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+const db = firebase.database();
 
 // =======================
 // Session / Access Control
 // =======================
 if (sessionStorage.getItem("isLoggedIn") !== "Webconadmin") {
-    window.location.replace("Login.html");
+    window.location.replace("index.html");
 }
 
 // Prevent back button
@@ -226,24 +226,70 @@ function updateColumnTotals(tableId) {
 // =======================
 // Cloud Sync
 // =======================
-async function saveToCloud() {
+function saveToCloud() {
   const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  try {
-    await db.collection("devChecklists").doc(CLOUD_DOC_ID).set({
-      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-      tables: data
-    });
-    console.log("☁️ Cloud sync complete");
-  } catch (err) {
-    console.error("❌ Cloud save failed:", err);
-  }
+  db.ref(`devChecklists/${CLOUD_DOC_ID}`).set({
+    updatedAt: firebase.database.ServerValue.TIMESTAMP,
+    tables: data
+  })
+  .then(() => console.log("☁️ Cloud sync complete"))
+  .catch(err => console.error("❌ Cloud save failed:", err));
 }
 
+// Optimized Real-time Listener
+db.ref(`devChecklists/${CLOUD_DOC_ID}/tables`).on("value", snapshot => {
+  const cloudTables = snapshot.val() || [];
+  const container = document.getElementById("tablesContainer");
+  const currentWrappers = [...container.querySelectorAll(".table-wrapper")];
+
+  cloudTables.forEach((tableData, index) => {
+    const wrapper = currentWrappers[index];
+
+    if (wrapper) {
+      // Update existing table
+      const rows = wrapper.querySelectorAll("tbody tr");
+      tableData.rows.forEach((rowData, rIndex) => {
+        const tr = rows[rIndex];
+        if (!tr) return;
+
+        tr.querySelectorAll("input[type='checkbox']").forEach((cb, cIndex) => {
+          if (cb.checked !== rowData.checkboxes[cIndex]) cb.checked = rowData.checkboxes[cIndex];
+        });
+
+        tr.querySelectorAll("textarea").forEach((ta, cIndex) => {
+          if (ta.value !== rowData.comments[cIndex]) {
+            ta.value = rowData.comments[cIndex];
+            ta.closest("td").classList.toggle("has-comment", ta.value.trim() !== "");
+          }
+        });
+
+        updateErrorCount(tr);
+      });
+
+      updateColumnTotals(wrapper.querySelector("table").id);
+    } else {
+      // Generate new table if missing
+      generateTable("tablesContainer", tableData);
+    }
+  });
+
+  // Remove extra tables if cloud has fewer tables
+  if (currentWrappers.length > cloudTables.length) {
+    for (let i = cloudTables.length; i < currentWrappers.length; i++) {
+      currentWrappers[i].remove();
+    }
+  }
+
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudTables));
+  tableCount = cloudTables.length;
+});
+
+// Load from cloud
 async function loadFromCloud() {
   try {
-    const doc = await db.collection("devChecklists").doc(CLOUD_DOC_ID).get();
-    if (!doc.exists) return false;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(doc.data().tables || []));
+    const snapshot = await db.ref(`devChecklists/${CLOUD_DOC_ID}`).get();
+    if (!snapshot.exists()) return false;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot.val().tables || []));
     console.log("☁️ Loaded from cloud");
     return true;
   } catch (err) {
