@@ -1,7 +1,6 @@
 // =======================
-// Firebase
+// Firebase Setup
 // =======================
-// For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
   apiKey: "AIzaSyD2i8d1usAifaTvqkNzgylOLU2XDtakAUk",
   authDomain: "webcon-concerns.firebaseapp.com",
@@ -13,27 +12,31 @@ const firebaseConfig = {
   measurementId: "G-L6LFLKHP6P"
 };
 
+// Initialize Firebase
 firebase.initializeApp(firebaseConfig);
-firebase.analytics();
 const db = firebase.firestore();
 
-// Use a fixed doc id for all sessions (or adjust per user)
-const CLOUD_DOC_ID = "default-checklist";
-
 // =======================
-// Access control
+// Session / Access Control
 // =======================
 if (sessionStorage.getItem("isLoggedIn") !== "Webconadmin") {
     window.location.replace("Login.html");
 }
 
+// Prevent back button
 history.pushState(null, null, location.href);
 window.onpopstate = () => { history.pushState(null, null, location.href); };
 
 // =======================
-// Concerns & Devs
+// Constants & Globals
 // =======================
-const concerns = [ "OFDB","Missing Content","Idol Time","404","Orch Entry Missing","Minify CSS/JS","Darkmode","Do Not Sell","Permalink","Dropdown","Hover","DSHRBD/SEO","Cred Details Acc","Cookies","Fav Icon","Break Task","Check List","Page Not Found","?s-desc","Alt Value","Forms","Highlight","HTML & CSS Validation","Pages Trash","Feature","Dummy Img PREM","Banner","Fonts","Logo","Responsive","301","Gtrans","Theme" ];
+const concerns = [
+  "OFDB","Missing Content","Idol Time","404","Orch Entry Missing","Minify CSS/JS","Darkmode",
+  "Do Not Sell","Permalink","Dropdown","Hover","DSHRBD/SEO","Cred Details Acc","Cookies",
+  "Fav Icon","Break Task","Check List","Page Not Found","?s-desc","Alt Value","Forms",
+  "Highlight","HTML & CSS Validation","Pages Trash","Feature","Dummy Img PREM","Banner",
+  "Fonts","Logo","Responsive","301","Gtrans","Theme"
+];
 
 const devs = [
   { team: "KEPPEL", name: "Xaviery Batucan", remarks: "DEV 3" },
@@ -52,11 +55,10 @@ const devs = [
   { team: "PROBATIONARY", name: "Hinlorie Rebaño", remarks: "3 MONTHS" }
 ];
 
-// =======================
-// Globals
-// =======================
 let tableCount = 0;
 const STORAGE_KEY = "devChecklistTables";
+const CLOUD_DOC_ID = "default-checklist";
+let cloudSaveTimeout;
 
 // =======================
 // Save / Load
@@ -76,7 +78,10 @@ function saveTables() {
   });
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-  saveToCloud(); // cloud sync
+
+  // Debounce cloud save to reduce writes
+  clearTimeout(cloudSaveTimeout);
+  cloudSaveTimeout = setTimeout(saveToCloud, 1000);
 }
 
 function attachAutoSave(wrapper) {
@@ -136,10 +141,10 @@ function generateTable(containerId, savedData = null) {
       </tr>
     </tfoot>
   `;
-
   wrapper.appendChild(table);
   container.appendChild(wrapper);
 
+  // Headers
   const headerRow = document.getElementById(`${tableId}-headers`);
   concerns.forEach(c => {
     const th = document.createElement("th");
@@ -147,6 +152,7 @@ function generateTable(containerId, savedData = null) {
     headerRow.appendChild(th);
   });
 
+  // Footer totals
   const totalsRow = document.getElementById(`${tableId}-totals`);
   concerns.forEach(() => {
     const td = document.createElement("td");
@@ -159,6 +165,7 @@ function generateTable(containerId, savedData = null) {
   grand.textContent = "0";
   totalsRow.appendChild(grand);
 
+  // Body
   const body = document.getElementById(`${tableId}-body`);
   devs.forEach((dev, r) => {
     const tr = document.createElement("tr");
@@ -198,8 +205,7 @@ function generateTable(containerId, savedData = null) {
 // Calculations
 // =======================
 function updateErrorCount(row) {
-  const count = [...row.querySelectorAll("input[type='checkbox']")]
-    .filter(cb => cb.checked).length;
+  const count = [...row.querySelectorAll("input[type='checkbox']")].filter(cb => cb.checked).length;
   const cell = row.querySelector(".errors");
   cell.textContent = count;
   cell.className = "errors " + (count === 0 ? "low" : count <= 5 ? "medium" : "high");
@@ -250,7 +256,8 @@ async function loadFromCloud() {
 // Initialize
 // =======================
 (async function init() {
-  document.getElementById("tablesContainer").innerHTML = "";
+  const container = document.getElementById("tablesContainer");
+  container.innerHTML = "";
   await loadFromCloud();
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
   if (saved.length) saved.forEach(data => generateTable("tablesContainer", data));
@@ -260,5 +267,12 @@ async function loadFromCloud() {
 // =======================
 // Buttons
 // =======================
-document.getElementById("addTableBtn").addEventListener("click", () => { generateTable("tablesContainer"); saveTables(); });
-document.getElementById("saveTablesBtn").addEventListener("click", () => { saveTables(); alert("All tables saved successfully!"); });
+document.getElementById("addTableBtn").addEventListener("click", () => { 
+  generateTable("tablesContainer"); 
+  saveTables(); 
+});
+
+document.getElementById("saveTablesBtn").addEventListener("click", () => { 
+  saveTables(); 
+  alert("All tables saved successfully!"); 
+});
