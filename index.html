@@ -125,35 +125,84 @@
 <body>
 
 <div class="login-container">
-    <h2>Admin Login</h2>
-    <form onsubmit="return validateForm()">
-        <input type="password" id="password" name="password" placeholder="Enter Password" required>
-        <input type="submit" value="Login">
-    </form>
+  <h2>Admin Login</h2>
+  <form onsubmit="login(); return false;">
+    <input type="text" id="email" placeholder="Email" required>
+    <input type="password" id="password" placeholder="Password" required>
+    <input type="submit" value="Login">
+  </form>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
 <script>
-    function validateForm() {
-        var password = document.getElementById("password").value;
+  const firebaseConfig = {
+    apiKey: "AIzaSyD2i8d1usAifaTvqkNzgylOLU2XDtakAUk",
+    authDomain: "webcon-concerns.firebaseapp.com",
+    databaseURL: "https://webcon-concerns-default-rtdb.firebaseio.com",
+    projectId: "webcon-concerns",
+    storageBucket: "webcon-concerns.firebasestorage.app",
+    messagingSenderId: "416233156932",
+    appId: "1:416233156932:web:78a1dfce6c61cf030f2711"
+  };
 
-        if (password !== "Webconadmin") {
-            alert("Invalid password");
-            return false;
-        }
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-        // Mark user as logged in
-        sessionStorage.setItem("isLoggedIn", "Webconadmin");
+  const PASSWORD = "Webconadmin";
+  const MAX_USERS = 4;
 
-        // Redirect
-        window.location.replace("Main.html");
-        return false;
+  const ALLOWED_EMAILS = [
+    "josramas@proweaver.email",
+    "darescandallo@proweaver.email",
+    "jomtabornal@proweaver.email",
+    "jhepanoncio@proweaver.email"
+  ];
+
+  const SESSION_ID = "sess_" + Math.random().toString(36).slice(2);
+
+  function login() {
+    const email = document.getElementById("email").value.trim();
+    const password = document.getElementById("password").value;
+
+    if (!ALLOWED_EMAILS.includes(email)) {
+      alert("Email not authorized");
+      return;
     }
 
-    // Redirect if already logged in
-    if (sessionStorage.getItem("isLoggedIn") === "Webconadmin") {
-        window.location.replace("Main.html");
+    if (password !== PASSWORD) {
+      alert("Incorrect password");
+      return;
     }
+
+    const sessionsRef = db.ref("sessions");
+
+    sessionsRef.once("value", snap => {
+      if (Object.keys(snap.val() || {}).length >= MAX_USERS) {
+        alert("Maximum of 4 users already logged in.");
+        return;
+      }
+
+      const userRef = sessionsRef.child(SESSION_ID);
+      userRef.set({ email, joinedAt: Date.now() });
+      userRef.onDisconnect().remove();
+
+      sessionStorage.setItem("loggedIn", "true");
+      sessionStorage.setItem("email", email);
+      sessionStorage.setItem("sessionId", SESSION_ID);
+
+      location.href = "Main.html";
+    });
+  }
+
+  // auto-redirect if already logged in
+  if (sessionStorage.getItem("loggedIn") === "true") {
+    location.replace("Main.html");
+  }
 </script>
+
+
 
 </body>
 </html>

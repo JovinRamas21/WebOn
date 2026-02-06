@@ -1,30 +1,37 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Dev Concerns Checklist</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<h2>Dev Concerns Checklist</h2>
+<header class="app-header">
+  <h2>Dev Concerns Checklist</h2>
 
-<div style="margin-bottom: 10px;">
-  <button id="addTableBtn" class="btn-add-table">
-    <span class="btn-icon">➕</span> Add Table
-  </button>
-  <button id="saveTablesBtn" style="margin-left: 15px; background: #007bff; color: white;">Save All</button>
+  <div class="toolbar">
+    <button id="addTableBtn" class="btn btn-primary">
+      <span class="btn-icon">➕</span> Add Table
+    </button>
+    <button id="saveTablesBtn" class="btn btn-secondary">
+      💾 Save All
+    </button>
+  </div>
+
+  <div id="presencePanel">
+  <h3>Online Users</h3>
+  <ul id="onlineUsers"></ul>
 </div>
 
-<div id="tablesContainer">
-  <!-- Tables will be dynamically generated here -->
-</div>
+</header>
 
-<!-- Firebase v8 (namespaced, matches your code style) -->
+<main id="tablesContainer"></main>
+
+<!-- Firebase (compat) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-
 
 <script src="main.js"></script>
 </body>
