@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Webcon Admin Login</title>
 <style>
-    /* ===== Body & Background ===== */
     body {
         margin: 0;
         padding: 0;
@@ -35,7 +34,6 @@
         100% { background-position: 0 0; }
     }
 
-    /* ===== Container ===== */
     .login-container {
         position: relative;
         z-index: 1;
@@ -48,9 +46,7 @@
         transition: transform 0.3s ease;
     }
 
-    .login-container:hover {
-        transform: scale(1.05);
-    }
+    .login-container:hover { transform: scale(1.05); }
 
     h2 {
         color: #00ffff;
@@ -59,8 +55,7 @@
         text-shadow: 0 0 10px #00ffff, 0 0 20px #ff00ff;
     }
 
-    /* ===== Input Fields ===== */
-    input[type="password"], input[type="text"] {
+    input[type="text"], input[type="password"] {
         width: 90%;
         padding: 15px;
         margin: 10px 0;
@@ -74,12 +69,11 @@
         transition: 0.3s ease;
     }
 
-    input[type="password"]:focus, input[type="text"]:focus {
+    input[type="text"]:focus, input[type="password"]:focus {
         box-shadow: 0 0 20px #00ffff, 0 0 40px #ff00ff;
         background: rgba(255, 255, 255, 0.1);
     }
 
-    /* ===== Button ===== */
     input[type="submit"] {
         width: 50%;
         padding: 12px;
@@ -109,17 +103,12 @@
         transform: skewX(-20deg);
     }
 
-    input[type="submit"]:hover::after {
-        left: 100%;
-    }
-
+    input[type="submit"]:hover::after { left: 100%; }
     input[type="submit"]:hover {
         box-shadow: 0 0 20px #00ffff, 0 0 40px #ff00ff, 0 0 60px #ffffff;
         transform: scale(1.05);
     }
-
 </style>
-<!-- Google Fonts for futuristic look -->
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -134,6 +123,7 @@
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <script>
@@ -150,17 +140,13 @@
   firebase.initializeApp(firebaseConfig);
   const db = firebase.database();
 
-  const PASSWORD = "Webconadmin";
-  const MAX_USERS = 4;
-
+  const SESSION_ID = "sess_" + Math.random().toString(36).slice(2);
   const ALLOWED_EMAILS = [
     "josramas@proweaver.email",
     "darescandallo@proweaver.email",
     "jomtabornal@proweaver.email",
     "jhepanoncio@proweaver.email"
   ];
-
-  const SESSION_ID = "sess_" + Math.random().toString(36).slice(2);
 
   function login() {
     const email = document.getElementById("email").value.trim();
@@ -171,38 +157,27 @@
       return;
     }
 
-    if (password !== PASSWORD) {
-      alert("Incorrect password");
-      return;
-    }
+    firebase.auth().signInWithEmailAndPassword(email, password)
+      .then(() => {
+        const sessionRef = db.ref(`sessions/${SESSION_ID}`);
+        sessionRef.set({ email, joinedAt: Date.now() });
+        sessionRef.onDisconnect().remove();
 
-    const sessionsRef = db.ref("sessions");
+        sessionStorage.setItem("loggedIn", "true");
+        sessionStorage.setItem("email", email);
+        sessionStorage.setItem("sessionId", SESSION_ID);
 
-    sessionsRef.once("value", snap => {
-      if (Object.keys(snap.val() || {}).length >= MAX_USERS) {
-        alert("Maximum of 4 users already logged in.");
-        return;
-      }
-
-      const userRef = sessionsRef.child(SESSION_ID);
-      userRef.set({ email, joinedAt: Date.now() });
-      userRef.onDisconnect().remove();
-
-      sessionStorage.setItem("loggedIn", "true");
-      sessionStorage.setItem("email", email);
-      sessionStorage.setItem("sessionId", SESSION_ID);
-
-      location.href = "Main.html";
-    });
+        location.href = "Main.html";
+      })
+      .catch(err => {
+        alert("Login failed: " + err.message);
+      });
   }
 
-  // auto-redirect if already logged in
-  if (sessionStorage.getItem("loggedIn") === "true") {
-    location.replace("Main.html");
-  }
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) location.replace("Main.html");
+  });
 </script>
-
-
 
 </body>
 </html>

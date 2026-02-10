@@ -18,8 +18,6 @@ const db = firebase.database();
 // =======================
 // Globals / Constants
 // =======================
-const PASSWORD = "Webconadmin";
-const MAX_USERS = 4;
 const SESSION_ID = "sess_" + Math.random().toString(36).slice(2);
 const ALLOWED_EMAILS = [
   "josramas@proweaver.email",
@@ -39,11 +37,11 @@ let tablesLoaded = false;
 // Checklist Data
 // =======================
 const concerns = [
-  "OFDB", "Missing Content", "Idol Time", "404", "Orch Entry Missing", "Minify CSS/JS", "Darkmode",
-  "Do Not Sell", "Permalink", "Dropdown", "Hover", "DSHRBD/SEO", "Cred Details Acc", "Cookies",
-  "Fav Icon", "Break Task", "Check List", "Page Not Found", "?s-desc", "Alt Value", "Forms",
-  "Highlight", "HTML & CSS Validation", "Pages Trash", "Feature", "Dummy Img PREM", "Banner",
-  "Fonts", "Logo", "Responsive", "301", "Gtrans", "Theme"
+  "OFDB","Missing Content","Idol Time","404","Orch Entry Missing","Minify CSS/JS","Darkmode",
+  "Do Not Sell","Permalink","Dropdown","Hover","DSHRBD/SEO","Cred Details Acc","Cookies",
+  "Fav Icon","Break Task","Check List","Page Not Found","?s-desc","Alt Value","Forms",
+  "Highlight","HTML & CSS Validation","Pages Trash","Feature","Dummy Img PREM","Banner",
+  "Fonts","Logo","Responsive","301","Gtrans","Theme"
 ];
 
 const devs = [
@@ -70,24 +68,36 @@ function login() {
   const email = document.getElementById("email").value.trim();
   const password = document.getElementById("password").value;
 
-  if (!ALLOWED_EMAILS.includes(email)) return alert("Email not authorized");
-  if (password !== PASSWORD) return alert("Incorrect password");
+  if (!ALLOWED_EMAILS.includes(email)) {
+    return alert("Email not authorized");
+  }
 
-  const sessionsRef = db.ref("sessions");
+  firebase.auth().signInWithEmailAndPassword(email, password)
+    .then(() => {
+      // Optional presence tracking
+      const sessionRef = db.ref(`sessions/${SESSION_ID}`);
+      sessionRef.set({ email, joinedAt: Date.now() });
+      sessionRef.onDisconnect().remove();
 
-  sessionsRef.once("value", snap => {
-    // Removed MAX_USERS check to allow unlimited users
+      sessionStorage.setItem("loggedIn", "true");
+      sessionStorage.setItem("email", email);
+      sessionStorage.setItem("sessionId", SESSION_ID);
 
-    db.ref(`sessions/${SESSION_ID}`).set({ email, joinedAt: Date.now() }).onDisconnect().remove();
-
-    sessionStorage.setItem("loggedIn", "true");
-    sessionStorage.setItem("email", email);
-    sessionStorage.setItem("sessionId", SESSION_ID);
-
-    location.href = "Main.html";
-  });
+      location.href = "Main.html";
+    })
+    .catch(err => {
+      alert("Login failed: " + err.message);
+    });
 }
 
+// =======================
+// AUTO-REDIRECT IF LOGGED IN
+// =======================
+firebase.auth().onAuthStateChanged(user => {
+  if (user) {
+    location.replace("Main.html");
+  }
+});
 
 // =======================
 // PAGE GUARD (Main.html)
@@ -108,17 +118,15 @@ function initPresence() {
   const sessionEmail = sessionStorage.getItem("email");
   const presenceRef = db.ref(`presence/${SESSION_ID}`);
 
-  // Add current user
   presenceRef.set({ email: sessionEmail, onlineAt: Date.now() });
   presenceRef.onDisconnect().remove();
 
-  // Listen to online users
   db.ref("presence").on("value", snap => {
     const users = snap.val() || {};
     const list = document.getElementById("onlineUsers");
     if (!list) return;
 
-    list.innerHTML = ""; // clear old list
+    list.innerHTML = "";
     Object.values(users).forEach(u => {
       const li = document.createElement("li");
       li.textContent = u.email;
@@ -126,7 +134,6 @@ function initPresence() {
     });
   });
 }
-
 
 // =======================
 // TABLE GENERATION
@@ -166,11 +173,9 @@ function generateTable(containerId, savedData = null) {
       <tr id="${tableId}-totals"><td colspan="3"><strong>Total Errors</strong></td></tr>
     </tfoot>
   `;
-
   wrapper.appendChild(table);
   container.appendChild(wrapper);
 
-  // Headers
   const headerRow = document.getElementById(`${tableId}-headers`);
   concerns.forEach(c => {
     const th = document.createElement("th");
@@ -178,7 +183,6 @@ function generateTable(containerId, savedData = null) {
     headerRow.appendChild(th);
   });
 
-  // Footer totals
   const totalsRow = document.getElementById(`${tableId}-totals`);
   concerns.forEach(() => {
     const td = document.createElement("td");
@@ -191,7 +195,6 @@ function generateTable(containerId, savedData = null) {
   grand.textContent = "0";
   totalsRow.appendChild(grand);
 
-  // Body rows
   const body = document.getElementById(`${tableId}-body`);
   devs.forEach((dev, r) => {
     const tr = document.createElement("tr");
