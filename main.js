@@ -14,27 +14,33 @@ const firebaseConfig = {
 
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
+const auth = firebase.auth();
 
 // =======================
-// Globals / Constants
+// CONSTANTS & STATE
 // =======================
-const SESSION_ID = "sess_" + Math.random().toString(36).slice(2);
-const ALLOWED_EMAILS = [
-  "josramas@proweaver.email",
-  "darescandallo@proweaver.email",
-  "jomtabornal@proweaver.email",
-  "jhepanoncio@proweaver.email"
-];
-
+const SESSION_ID = sessionStorage.getItem("sessionId");
 const STORAGE_KEY = "devChecklistTables";
 const CLOUD_DOC = "devChecklists/default-checklist";
-
+const USER_COLOR_KEY = "userColor";
 let tableCount = 0;
-let localEditLock = false;
+let isLocalEdit = false;
+let isApplyingRemote = false;
 let tablesLoaded = false;
 
+// Assign random color to user
+function getUserColor() {
+  let color = sessionStorage.getItem(USER_COLOR_KEY);
+  if (!color) {
+    color = `hsl(${Math.floor(Math.random() * 360)}, 70%, 75%)`;
+    sessionStorage.setItem(USER_COLOR_KEY, color);
+  }
+  return color;
+}
+const USER_COLOR = getUserColor();
+
 // =======================
-// Checklist Data
+// DATA
 // =======================
 const concerns = [
   "OFDB","Missing Content","Idol Time","404","Orch Entry Missing","Minify CSS/JS","Darkmode",
@@ -62,49 +68,10 @@ const devs = [
 ];
 
 // =======================
-// LOGIN (index.html)
-// =======================
-function login() {
-  const email = document.getElementById("email").value.trim();
-  const password = document.getElementById("password").value;
-
-  if (!ALLOWED_EMAILS.includes(email)) {
-    return alert("Email not authorized");
-  }
-
-  firebase.auth().signInWithEmailAndPassword(email, password)
-    .then(() => {
-      // Optional presence tracking
-      const sessionRef = db.ref(`sessions/${SESSION_ID}`);
-      sessionRef.set({ email, joinedAt: Date.now() });
-      sessionRef.onDisconnect().remove();
-
-      sessionStorage.setItem("loggedIn", "true");
-      sessionStorage.setItem("email", email);
-      sessionStorage.setItem("sessionId", SESSION_ID);
-
-      location.href = "Main.html";
-    })
-    .catch(err => {
-      alert("Login failed: " + err.message);
-    });
-}
-
-// =======================
-// AUTO-REDIRECT IF LOGGED IN
-// =======================
-firebase.auth().onAuthStateChanged(user => {
-  if (user) {
-    location.replace("Main.html");
-  }
-});
-
-// =======================
-// PAGE GUARD (Main.html)
+// PAGE GUARD
 // =======================
 function checkLogin() {
-  const container = document.getElementById("tablesContainer");
-  if (container && sessionStorage.getItem("loggedIn") !== "true") {
+  if (!SESSION_ID || !sessionStorage.getItem("loggedIn")) {
     location.replace("index.html");
   }
 }
@@ -113,25 +80,69 @@ function checkLogin() {
 // PRESENCE / ONLINE USERS
 // =======================
 function initPresence() {
-  if (!sessionStorage.getItem("loggedIn")) return;
-
-  const sessionEmail = sessionStorage.getItem("email");
+  if (!SESSION_ID) return;
+  const email = sessionStorage.getItem("email");
   const presenceRef = db.ref(`presence/${SESSION_ID}`);
 
-  presenceRef.set({ email: sessionEmail, onlineAt: Date.now() });
+  // Set presence with color & activity
+  presenceRef.set({
+    email,
+    color: USER_COLOR,
+    onlineAt: Date.now(),
+    activity: null
+  });
   presenceRef.onDisconnect().remove();
 
+  // Listen for online users and update list & highlights
   db.ref("presence").on("value", snap => {
     const users = snap.val() || {};
-    const list = document.getElementById("onlineUsers");
-    if (!list) return;
+    renderOnlineUsers(users);
+    applyUserHighlights(users);
+  });
+}
 
-    list.innerHTML = "";
-    Object.values(users).forEach(u => {
-      const li = document.createElement("li");
-      li.textContent = u.email;
-      list.appendChild(li);
-    });
+// Show users in the online list
+function renderOnlineUsers(users) {
+  const ul = document.getElementById("onlineUsers");
+ul.innerHTML = "";
+Object.values(users).forEach(u => {
+  const li = document.createElement("li");
+  li.textContent = u.email;
+  li.style.color = u.color || "#000";
+  ul.appendChild(li);
+});
+}
+
+// Update user's current activity (cell being edited)
+function updateUserActivity(info) {
+  if (!SESSION_ID) return;
+  db.ref(`presence/${SESSION_ID}/activity`).set(info);
+}
+
+// Apply color highlights for other users with hover name
+function applyUserHighlights(users) {
+  // Clear previous
+  document.querySelectorAll(".user-highlight").forEach(el => {
+    el.classList.remove("user-highlight");
+    el.style.outline = "";
+    el.removeAttribute("data-user");
+    el.removeAttribute("title");
+  });
+
+  Object.entries(users).forEach(([id, user]) => {
+    if (!user.activity || id === SESSION_ID) return;
+    const { tableId, row, col } = user.activity;
+    const table = document.getElementById(tableId);
+    if (!table) return;
+    const tr = table.querySelectorAll("tbody tr")[row];
+    if (!tr) return;
+    const td = tr.querySelectorAll("td")[col + 3];
+    if (!td) return;
+
+    td.classList.add("user-highlight");
+    td.style.outline = `3px solid ${user.color}`;
+    td.dataset.user = user.email;
+    td.title = `Editing: ${user.email}`; // hover tooltip
   });
 }
 
@@ -140,7 +151,7 @@ function initPresence() {
 // =======================
 function generateTable(containerId, savedData = null) {
   tableCount++;
-  const container = document.getElementById(containerId);
+  const container = typeof containerId === "string" ? document.getElementById(containerId) : containerId;
   if (!container) return;
 
   const tableId = `devTable_${tableCount}`;
@@ -170,12 +181,16 @@ function generateTable(containerId, savedData = null) {
     </thead>
     <tbody id="${tableId}-body"></tbody>
     <tfoot>
-      <tr id="${tableId}-totals"><td colspan="3"><strong>Total Errors</strong></td></tr>
+      <tr id="${tableId}-totals">
+        <td colspan="3"><strong>Total Errors</strong></td>
+      </tr>
     </tfoot>
   `;
+
   wrapper.appendChild(table);
   container.appendChild(wrapper);
 
+  // Headers
   const headerRow = document.getElementById(`${tableId}-headers`);
   concerns.forEach(c => {
     const th = document.createElement("th");
@@ -183,6 +198,7 @@ function generateTable(containerId, savedData = null) {
     headerRow.appendChild(th);
   });
 
+  // Totals
   const totalsRow = document.getElementById(`${tableId}-totals`);
   concerns.forEach(() => {
     const td = document.createElement("td");
@@ -195,6 +211,7 @@ function generateTable(containerId, savedData = null) {
   grand.textContent = "0";
   totalsRow.appendChild(grand);
 
+  // Body
   const body = document.getElementById(`${tableId}-body`);
   devs.forEach((dev, r) => {
     const tr = document.createElement("tr");
@@ -236,25 +253,54 @@ function generateTable(containerId, savedData = null) {
 }
 
 // =======================
-// AUTO-SAVE ATTACH
+// AUTO SAVE & TYPING
 // =======================
 function attachAutoSave(wrapper) {
+  let typingTimeout;
+
+  wrapper.addEventListener("focusin", e => {
+    const td = e.target.closest("td");
+    if (!td) return;
+    const tr = td.closest("tr");
+    const table = td.closest("table");
+
+    updateUserActivity({
+      tableId: table.id,
+      row: tr.rowIndex - 1,
+      col: td.cellIndex - 3,
+      field: e.target.tagName === "TEXTAREA" ? "comment" : "checkbox"
+    });
+  });
+
+  wrapper.addEventListener("input", e => {
+    const td = e.target.closest("td");
+    if (!td) return;
+    const tr = td.closest("tr");
+    const table = td.closest("table");
+
+    // Typing indicator
+    updateUserActivity({
+      tableId: table.id,
+      row: tr.rowIndex - 1,
+      col: td.cellIndex - 3,
+      field: e.target.tagName === "TEXTAREA" ? "comment" : "checkbox"
+    });
+    clearTimeout(typingTimeout);
+    typingTimeout = setTimeout(() => updateUserActivity(null), 2000);
+
+    if (e.target.matches("textarea")) {
+      td.classList.toggle("has-comment", e.target.value.trim() !== "");
+    }
+
+    saveTables();
+  });
+
   wrapper.addEventListener("change", e => {
     if (e.target.matches("input[type='checkbox'], input[type='date']")) {
       const row = e.target.closest("tr");
       if (row) updateErrorCount(row);
-
       const table = e.target.closest("table");
       if (table) updateColumnTotals(table.id);
-
-      saveTables();
-    }
-  });
-
-  wrapper.addEventListener("input", e => {
-    if (e.target.matches("textarea")) {
-      const td = e.target.closest("td");
-      td.classList.toggle("has-comment", e.target.value.trim() !== "");
       saveTables();
     }
   });
@@ -273,133 +319,90 @@ function updateErrorCount(row) {
 function updateColumnTotals(tableId) {
   const table = document.getElementById(tableId);
   const totals = Array(concerns.length).fill(0);
-
   table.querySelectorAll("tbody tr").forEach(row => {
     row.querySelectorAll("input[type='checkbox']").forEach((cb, i) => {
       if (cb.checked) totals[i]++;
     });
   });
-
   table.querySelectorAll(".column-total").forEach((td, i) => td.textContent = totals[i]);
   table.querySelector(".grand-total").textContent = totals.reduce((a, b) => a + b, 0);
 }
 
 // =======================
-// CLOUD LOAD
-// =======================
-async function loadFromCloud() {
-  try {
-    const snapshot = await db.ref(CLOUD_DOC).get();
-    if (!snapshot.exists()) return false;
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot.val().tables || []));
-    console.log("☁️ Loaded from cloud");
-    return true;
-  } catch (err) {
-    console.error("❌ Cloud load failed:", err);
-    return false;
-  }
-}
-
-// =======================
-// REAL-TIME CLOUD SYNC
-// =======================
-function initRealTimeSync() {
-  const cloudRef = db.ref(CLOUD_DOC);
-
-  cloudRef.on("value", snap => {
-    if (!snap.exists()) return;
-    const cloudTables = snap.val().tables || [];
-
-    if (localEditLock) return;
-
-    localEditLock = true;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudTables));
-
-    const container = document.getElementById("tablesContainer");
-    if (!container) return;
-
-    container.innerHTML = "";
-    cloudTables.forEach(data => generateTable("tablesContainer", data));
-
-    tablesLoaded = true;
-    localEditLock = false;
-
-    console.log("☁️ Real-time sync applied from cloud");
-  });
-
-  document.addEventListener("change", e => {
-    if (!e.target.matches("input[type='checkbox'], textarea, input[type='date']")) return;
-    saveTables(); 
-  });
-}
-
-// =======================
-// SAVE TABLES (Real-Time Push)
+// SAVE / LOAD
 // =======================
 function saveTables() {
-  if (localEditLock) return;
+  if (isApplyingRemote) return;
+  isLocalEdit = true;
 
-  const data = [...document.querySelectorAll(".table-wrapper")].map(wrapper => ({
-    date: wrapper.querySelector("input[type='date']").value,
+  const tables = [...document.querySelectorAll(".table-wrapper")].map(wrapper => ({
+    date: wrapper.querySelector("input[type='date']")?.value || "",
     rows: [...wrapper.querySelectorAll("tbody tr")].map(tr => ({
       checkboxes: [...tr.querySelectorAll("input[type='checkbox']")].map(cb => cb.checked),
       comments: [...tr.querySelectorAll("textarea")].map(ta => ta.value)
     }))
   }));
 
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(tables));
+  db.ref(CLOUD_DOC).set({ updatedAt: firebase.database.ServerValue.TIMESTAMP, tables }).catch(console.error);
 
-  db.ref(CLOUD_DOC).set({
-    updatedAt: firebase.database.ServerValue.TIMESTAMP,
-    tables: data
-  }).then(() => console.log("☁️ Local changes pushed to cloud"))
-    .catch(err => console.error("❌ Failed to push local changes:", err));
+  setTimeout(() => (isLocalEdit = false), 300);
+}
+
+async function loadFromCloud() {
+  try {
+    const snap = await db.ref(CLOUD_DOC).get();
+    if (!snap.exists()) return;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(snap.val().tables || []));
+  } catch (err) {
+    console.error(err);
+  }
 }
 
 // =======================
-// INITIALIZE
+// REALTIME SYNC
+// =======================
+function initRealTimeSync() {
+  db.ref(CLOUD_DOC).on("value", snap => {
+    if (!snap.exists() || isLocalEdit) return;
+    isApplyingRemote = true;
+
+    const tables = snap.val().tables || [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(tables));
+
+    const container = document.getElementById("tablesContainer");
+    container.innerHTML = "";
+    tables.forEach(t => generateTable(container, t));
+
+    setTimeout(() => (isApplyingRemote = false), 300);
+  });
+}
+
+// =======================
+// INIT APP
 // =======================
 async function initApp() {
   checkLogin();
   initPresence();
-
-  const container = document.getElementById("tablesContainer");
-  if (!container) return;
-  container.innerHTML = "";
-
   await loadFromCloud();
 
   const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-  if (!tablesLoaded) {
-    if (saved.length) saved.forEach(data => generateTable("tablesContainer", data));
-    else generateTable("tablesContainer");
-    tablesLoaded = true;
-  }
+  const container = document.getElementById("tablesContainer");
+  container.innerHTML = "";
+  if (saved.length) saved.forEach(t => generateTable(container, t));
+  else generateTable(container);
 
   initRealTimeSync();
 }
 
 // =======================
-// BUTTON EVENTS
+// START
 // =======================
-document.addEventListener("DOMContentLoaded", () => {
-  initApp();
+document.addEventListener("DOMContentLoaded", initApp);
 
-  document.getElementById("addTableBtn")?.addEventListener("click", () => {
-    generateTable("tablesContainer");
-    saveTables();
-  });
-
-  document.getElementById("saveTablesBtn")?.addEventListener("click", () => {
-    saveTables();
-    alert("All tables saved successfully!");
-  });
+// =======================
+// CLEANUP
+// =======================
+window.addEventListener("beforeunload", () => {
+  if (SESSION_ID) db.ref(`presence/${SESSION_ID}`).remove();
 });
-
-// =======================
-// CLEANUP / PREVENT BACK NAVIGATION
-// =======================
-window.addEventListener("beforeunload", () => db.ref(`sessions/${SESSION_ID}`).remove());
-history.pushState(null, null, location.href);
-window.onpopstate = () => history.pushState(null, null, location.href);
