@@ -3,179 +3,49 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Webcon Admin Login</title>
-<style>
-    body {
-        margin: 0;
-        padding: 0;
-        font-family: 'Orbitron', sans-serif;
-        background: url('images/MCLbackground.png') no-repeat center center fixed;
-        background-size: cover;
-        height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        overflow: hidden;
-    }
+<title>Developer Error Image Gallery</title>
+<link rel="stylesheet" href="style.css">
 
-    body::before {
-        content: '';
-        position: absolute;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(45deg, rgba(0,255,255,0.2), rgba(255,0,255,0.2));
-        animation: bgMove 10s linear infinite;
-        z-index: 0;
-    }
-
-    @keyframes bgMove {
-        0% { background-position: 0 0; }
-        50% { background-position: 100% 100%; }
-        100% { background-position: 0 0; }
-    }
-
-    .login-container {
-        position: relative;
-        z-index: 1;
-        background: rgba(0, 0, 50, 0.8);
-        padding: 40px 30px;
-        border-radius: 15px;
-        box-shadow: 0 0 40px #00ffff, 0 0 80px #ff00ff;
-        text-align: center;
-        backdrop-filter: blur(10px);
-        transition: transform 0.3s ease;
-    }
-
-    .login-container:hover { transform: scale(1.05); }
-
-    h2 {
-        color: #00ffff;
-        font-size: 2em;
-        margin-bottom: 20px;
-        text-shadow: 0 0 10px #00ffff, 0 0 20px #ff00ff;
-    }
-
-    input[type="password"], input[type="text"] {
-        width: 90%;
-        padding: 15px;
-        margin: 10px 0;
-        border: none;
-        border-radius: 8px;
-        outline: none;
-        font-size: 1em;
-        background: rgba(255, 255, 255, 0.05);
-        color: #fff;
-        box-shadow: inset 0 0 5px #00ffff, inset 0 0 10px #ff00ff;
-        transition: 0.3s ease;
-    }
-
-    input[type="password"]:focus, input[type="text"]:focus {
-        box-shadow: 0 0 20px #00ffff, 0 0 40px #ff00ff;
-        background: rgba(255, 255, 255, 0.1);
-    }
-
-    input[type="submit"] {
-        width: 50%;
-        padding: 12px;
-        margin-top: 15px;
-        border: none;
-        border-radius: 8px;
-        background: linear-gradient(45deg, #00ffff, #ff00ff);
-        color: #fff;
-        font-weight: bold;
-        cursor: pointer;
-        font-size: 1em;
-        box-shadow: 0 0 10px #00ffff, 0 0 20px #ff00ff;
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
-    }
-
-    input[type="submit"]::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: rgba(255,255,255,0.2);
-        transition: 0.5s;
-        transform: skewX(-20deg);
-    }
-
-    input[type="submit"]:hover::after { left: 100%; }
-    input[type="submit"]:hover { box-shadow: 0 0 20px #00ffff, 0 0 40px #ff00ff, 0 0 60px #ffffff; transform: scale(1.05); }
-</style>
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%2334a1f2'/><text x='50' y='60' font-size='60' text-anchor='middle' fill='white' font-family='Arial'>QC</text></svg>">
 </head>
 <body>
 
-<div class="login-container">
-  <h2>Admin Login</h2>
-  <form onsubmit="login(); return false;">
-    <input type="text" id="email" placeholder="Email" required>
-    <input type="password" id="password" placeholder="Password" required>
-    <input type="submit" value="Login">
-  </form>
+<h1>Developer Error Gallery</h1>
+<h2>February 10 - 27, 2025</h2>
+
+<div class="developer-container" id="developerContainer"></div>
+<div class="ranking-section">
+  <h2>🏆 Top 3 Developers With Most Errors</h2>
+  <div id="rankingList"></div>
 </div>
 
-<!-- Firebase -->
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<!-- Developer Modal -->
+<div id="devModal" class="modal">
+  <div class="modal-content">
+    <span class="close">&times;</span>
+    <h2 id="modalDeveloperName">Developer Info</h2>
+    <h3>Errors (Click an error to expand)</h3>
+    <div id="modalErrorsContainer"></div>
+  </div>
+</div>
 
-<script>
-  const firebaseConfig = {
-    apiKey: "AIzaSyD2i8d1usAifaTvqkNzgylOLU2XDtakAUk",
-    authDomain: "webcon-concerns.firebaseapp.com",
-    databaseURL: "https://webcon-concerns-default-rtdb.firebaseio.com",
-    projectId: "webcon-concerns",
-    storageBucket: "webcon-concerns.firebasestorage.app",
-    messagingSenderId: "416233156932",
-    appId: "1:416233156932:web:78a1dfce6c61cf030f2711",
-    measurementId: "G-L6LFLKHP6P"
-  };
+<!-- Error Modal -->
+<div id="errorModal" class="modal">
+  <div class="modal-content error-modal-content">
+    <span class="close-error">&times;</span>
+    <h3 id="expandedErrorTitle"></h3>
+     <div class="error-modal-controls">
+    <button id="attachImageTrigger">Attach Image</button>
+    <button id="removeAllImagesBtn">Remove All Images</button>
+  </div>
+    <div id="errorImageGallery"></div>
+    <p class="paste-note">Paste images from clipboard (Ctrl+V / Cmd+V) or Attach Image</p>
+    <input type="file" id="attachImageBtn" accept="image/*" style="display:none">
+  </div>
+</div>
 
-  firebase.initializeApp(firebaseConfig);
-  const auth = firebase.auth();
-  const db = firebase.database();
-
-  const ALLOWED_EMAILS = [
-    "josramas@proweaver.email",
-    "darescandallo@proweaver.email",
-    "jomtabornal@proweaver.email",
-    "jhepanoncio@proweaver.email"
-  ];
-
-  function login() {
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
-
-    if (!ALLOWED_EMAILS.includes(email)) return alert("Email not authorized");
-
-    auth.signInWithEmailAndPassword(email, password)
-      .then(userCredential => {
-        const user = userCredential.user;
-        const SESSION_ID = "sess_" + Math.random().toString(36).slice(2);
-
-        const sessionRef = db.ref(`sessions/${SESSION_ID}`);
-        sessionRef.onDisconnect().remove();
-        sessionRef.set({ email: user.email, joinedAt: Date.now() });
-
-        sessionStorage.setItem("loggedIn", "true");
-        sessionStorage.setItem("email", user.email);
-        sessionStorage.setItem("sessionId", SESSION_ID);
-
-        location.href = "Main.html";
-      })
-      .catch(error => alert(error.message));
-  }
-
-  // auto-redirect if already logged in
-  if (sessionStorage.getItem("loggedIn") === "true") {
-    location.replace("Main.html");
-  }
-</script>
-
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="script.js"></script>
 </body>
 </html>
