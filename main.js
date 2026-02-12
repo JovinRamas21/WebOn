@@ -159,14 +159,17 @@ function generateTable(containerId, savedData = null) {
   wrapper.className = "table-wrapper";
   wrapper.style.marginBottom = "30px";
 
- wrapper.innerHTML = `
-  <div style="margin-bottom:10px;">
-    <label style="font-weight:bold;margin-right:8px;">Checklist Date:</label>
-    <input type="date" value="${savedData?.date?.start || new Date().toISOString().split("T")[0]}">
-    <span style="margin:0 5px;">to</span>
-    <input type="date" value="${savedData?.date?.end || new Date().toISOString().split("T")[0]}">
-  </div>
-`;
+  // ===== Date Inputs =====
+  wrapper.innerHTML = `
+    <div style="margin-bottom:10px;">
+      <label style="font-weight:bold;margin-right:8px;">Checklist Date:</label>
+      <input type="date" value="${savedData?.date?.start || new Date().toISOString().split("T")[0]}">
+      <span style="margin:0 5px;">to</span>
+      <input type="date" value="${savedData?.date?.end || new Date().toISOString().split("T")[0]}">
+    </div>
+  `;
+
+  // ===== Create Table =====
   const table = document.createElement("table");
   table.id = tableId;
   table.innerHTML = `
@@ -187,18 +190,56 @@ function generateTable(containerId, savedData = null) {
       </tr>
     </tfoot>
   `;
-
   wrapper.appendChild(table);
   container.appendChild(wrapper);
 
-const graphBtn = document.createElement("button");
-graphBtn.textContent = "Show Graph";
-graphBtn.className = "btn btn-primary";
-graphBtn.style.marginBottom = "10px";
-graphBtn.addEventListener("click", () => showGraph(table));
-wrapper.insertBefore(graphBtn, table);
+  // ===== Buttons =====
+  const toggleBtn = document.createElement("button");
+  toggleBtn.textContent = "Show Table";
+  toggleBtn.className = "btn btn-secondary";
 
-  // Headers
+  const graphBtn = document.createElement("button");
+  graphBtn.textContent = "Show Graph";
+  graphBtn.className = "btn btn-primary";
+
+  const deleteBtn = document.createElement("button");
+  deleteBtn.textContent = "Delete Table";
+  deleteBtn.className = "btn btn-danger";
+
+  // Table hidden by default
+  table.style.display = "none";
+
+  // Button functionality
+  toggleBtn.addEventListener("click", () => {
+    if (table.style.display === "none") {
+      table.style.display = "";
+      toggleBtn.textContent = "Hide Table";
+    } else {
+      table.style.display = "none";
+      toggleBtn.textContent = "Show Table";
+    }
+  });
+
+  deleteBtn.addEventListener("click", () => {
+    if (confirm("Are you sure you want to delete this table?")) {
+      wrapper.remove();
+      saveTables();
+    }
+  });
+
+  graphBtn.addEventListener("click", () => showGraph(table));
+
+  // Horizontal button container, left-aligned
+  const btnContainer = document.createElement("div");
+  btnContainer.style.display = "flex";
+  btnContainer.style.justifyContent = "flex-start";
+  btnContainer.style.gap = "10px";
+  btnContainer.style.marginBottom = "10px";
+
+  btnContainer.append(toggleBtn, deleteBtn, graphBtn);
+  wrapper.insertBefore(btnContainer, table);
+
+  // ===== Headers =====
   const headerRow = document.getElementById(`${tableId}-headers`);
   concerns.forEach(c => {
     const th = document.createElement("th");
@@ -206,7 +247,7 @@ wrapper.insertBefore(graphBtn, table);
     headerRow.appendChild(th);
   });
 
-  // Totals
+  // ===== Totals =====
   const totalsRow = document.getElementById(`${tableId}-totals`);
   concerns.forEach(() => {
     const td = document.createElement("td");
@@ -219,7 +260,7 @@ wrapper.insertBefore(graphBtn, table);
   grand.textContent = "0";
   totalsRow.appendChild(grand);
 
-  // Body
+  // ===== Body =====
   const body = document.getElementById(`${tableId}-body`);
   devs.forEach((dev, r) => {
     const tr = document.createElement("tr");
@@ -257,7 +298,7 @@ wrapper.insertBefore(graphBtn, table);
         saveTables();
       });
 
-      // Toggle when clicking cell indicator
+      // Toggle comment box when clicking cell
       td.addEventListener("click", (e) => {
         if (e.target === cb || e.target === ta) return;
         if (td.classList.contains("has-comment")) {
@@ -450,7 +491,13 @@ document.getElementById("saveTablesBtn")?.addEventListener("click", () => {
 document.addEventListener("click", (e) => {
   document.querySelectorAll(".comment-box").forEach(ta => {
     const td = ta.closest("td");
-    if (ta.style.display === "block" && !td.contains(e.target)) {
+    const toggleBtn = td.querySelector("input[type='checkbox']"); // the toggle for showing comment
+    if (
+      ta.style.display === "block" &&
+      e.target !== ta &&
+      e.target !== toggleBtn &&
+      !td.contains(e.target)
+    ) {
       ta.style.display = "none";
     }
   });
