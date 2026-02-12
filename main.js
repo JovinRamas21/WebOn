@@ -19,7 +19,13 @@ const auth = firebase.auth();
 // =======================
 // CONSTANTS & STATE
 // =======================
-const SESSION_ID = sessionStorage.getItem("sessionId");
+let SESSION_ID = sessionStorage.getItem("sessionId");
+
+if (!SESSION_ID) {
+  SESSION_ID = "session_" + Date.now() + "_" + Math.random().toString(36).substring(2);
+  sessionStorage.setItem("sessionId", SESSION_ID);
+}
+
 const STORAGE_KEY = "devChecklistTables";
 const CLOUD_DOC = "devChecklists/default-checklist";
 const USER_COLOR_KEY = "userColor";
@@ -43,8 +49,8 @@ const USER_COLOR = getUserColor();
 // DATA
 // =======================
 const concerns = [
-  "OFDB","Missing Content","Idol Time","404","Orch Entry Missing","Minify CSS/JS","Darkmode",
-  "Do Not Sell","Permalink","Dropdown","Hover","DSHRBD/SEO","Cred Details Acc","Cookies",
+  "OFDB","Missing Content","Idol Time","404","Orch Entry Missing","Minify CSS & JS","Darkmode",
+  "Do Not Sell","Permalink","Dropdown","Hover","DSHRBD & SEO","Cred Details Acc","Cookies",
   "Fav Icon","Break Task","Check List","Page Not Found","?s-desc","Alt Value","Forms",
   "Highlight","HTML & CSS Validation","Pages Trash","Feature","Dummy Img PREM","Banner",
   "Fonts","Logo","Responsive","301","Gtrans","Theme"
@@ -53,7 +59,6 @@ const concerns = [
 const devs = [
   { team: "KEPPEL", name: "Xaviery Batucan", remarks: "DEV 3" },
   { team: "KEPPEL", name: "Clariss Ann Ladica", remarks: "DEV 2" },
-  { team: "TALISAY", name: "Lloyd Caesar Neri", remarks: "DEV 3" },
   { team: "TALISAY", name: "Rich Rhynor Austria", remarks: "DEV 2" },
   { team: "TALISAY", name: "Steve Wilben Saceda", remarks: "DEV 2" },
   { team: "TALISAY", name: "Jemuel Rivero", remarks: "DEV 2" },
@@ -71,7 +76,7 @@ const devs = [
 // PAGE GUARD
 // =======================
 function checkLogin() {
-  if (!SESSION_ID || !sessionStorage.getItem("loggedIn")) {
+  if (sessionStorage.getItem("loggedIn") !== "true") {
     location.replace("index.html");
   }
 }
@@ -81,19 +86,20 @@ function checkLogin() {
 // =======================
 function initPresence() {
   if (!SESSION_ID) return;
-  const email = sessionStorage.getItem("email");
+
+  const email = sessionStorage.getItem("email") || "Guest User";
   const presenceRef = db.ref(`presence/${SESSION_ID}`);
 
-  // Set presence with color & activity
+  presenceRef.onDisconnect().remove();
+
   presenceRef.set({
     email,
-    color: USER_COLOR,
     onlineAt: Date.now(),
     activity: null
   });
-  presenceRef.onDisconnect().remove();
 
-  // Listen for online users and update list & highlights
+  console.log("Presence initialized with ID:", SESSION_ID);
+
   db.ref("presence").on("value", snap => {
     const users = snap.val() || {};
     renderOnlineUsers(users);
@@ -101,48 +107,42 @@ function initPresence() {
   });
 }
 
-// Show users in the online list
 function renderOnlineUsers(users) {
   const ul = document.getElementById("onlineUsers");
-ul.innerHTML = "";
-Object.values(users).forEach(u => {
-  const li = document.createElement("li");
-  li.textContent = u.email;
-  li.style.color = u.color || "#000";
-  ul.appendChild(li);
-});
+  if (!ul) return;
+
+  ul.innerHTML = "";
+  Object.values(users).forEach(user => {
+    if (!user?.email) return;
+    const li = document.createElement("li");
+    li.textContent = user.email;
+    ul.appendChild(li);
+  });
 }
 
-// Update user's current activity (cell being edited)
-function updateUserActivity(info) {
-  if (!SESSION_ID) return;
-  db.ref(`presence/${SESSION_ID}/activity`).set(info);
-}
-
-// Apply color highlights for other users with hover name
 function applyUserHighlights(users) {
-  // Clear previous
   document.querySelectorAll(".user-highlight").forEach(el => {
     el.classList.remove("user-highlight");
     el.style.outline = "";
     el.removeAttribute("data-user");
-    el.removeAttribute("title");
   });
 
   Object.entries(users).forEach(([id, user]) => {
-    if (!user.activity || id === SESSION_ID) return;
+    if (!user?.activity || id === SESSION_ID) return;
+
     const { tableId, row, col } = user.activity;
     const table = document.getElementById(tableId);
     if (!table) return;
+
     const tr = table.querySelectorAll("tbody tr")[row];
     if (!tr) return;
+
     const td = tr.querySelectorAll("td")[col + 3];
     if (!td) return;
 
     td.classList.add("user-highlight");
-    td.style.outline = `3px solid ${user.color}`;
+    td.style.outline = "3px solid #2196f3";
     td.dataset.user = user.email;
-    td.title = `Editing: ${user.email}`; // hover tooltip
   });
 }
 
@@ -159,13 +159,14 @@ function generateTable(containerId, savedData = null) {
   wrapper.className = "table-wrapper";
   wrapper.style.marginBottom = "30px";
 
-  wrapper.innerHTML = `
-    <div style="margin-bottom:10px;">
-      <label style="font-weight:bold;margin-right:8px;">Checklist Date:</label>
-      <input type="date" value="${savedData?.date || new Date().toISOString().split("T")[0]}">
-    </div>
-  `;
-
+ wrapper.innerHTML = `
+  <div style="margin-bottom:10px;">
+    <label style="font-weight:bold;margin-right:8px;">Checklist Date:</label>
+    <input type="date" value="${savedData?.date?.start || new Date().toISOString().split("T")[0]}">
+    <span style="margin:0 5px;">to</span>
+    <input type="date" value="${savedData?.date?.end || new Date().toISOString().split("T")[0]}">
+  </div>
+`;
   const table = document.createElement("table");
   table.id = tableId;
   table.innerHTML = `
@@ -189,6 +190,13 @@ function generateTable(containerId, savedData = null) {
 
   wrapper.appendChild(table);
   container.appendChild(wrapper);
+
+const graphBtn = document.createElement("button");
+graphBtn.textContent = "Show Graph";
+graphBtn.className = "btn btn-primary";
+graphBtn.style.marginBottom = "10px";
+graphBtn.addEventListener("click", () => showGraph(table));
+wrapper.insertBefore(graphBtn, table);
 
   // Headers
   const headerRow = document.getElementById(`${tableId}-headers`);
@@ -228,12 +236,35 @@ function generateTable(containerId, savedData = null) {
       const ta = document.createElement("textarea");
       ta.className = "comment-box";
       ta.placeholder = "Add comment...";
+      ta.style.display = "none";
 
+      // Load saved data
       if (savedData?.rows?.[r]) {
         cb.checked = savedData.rows[r].checkboxes?.[c] || false;
         ta.value = savedData.rows[r].comments?.[c] || "";
         td.classList.toggle("has-comment", ta.value.trim() !== "");
       }
+
+      // Checkbox toggle
+      cb.addEventListener("change", () => {
+        ta.style.display = cb.checked ? "block" : "none";
+        if (cb.checked) ta.focus();
+      });
+
+      // Highlight indicator
+      ta.addEventListener("input", () => {
+        td.classList.toggle("has-comment", ta.value.trim() !== "");
+        saveTables();
+      });
+
+      // Toggle when clicking cell indicator
+      td.addEventListener("click", (e) => {
+        if (e.target === cb || e.target === ta) return;
+        if (td.classList.contains("has-comment")) {
+          ta.style.display = ta.style.display === "none" ? "block" : "none";
+          if (ta.style.display === "block") ta.focus();
+        }
+      });
 
       td.append(cb, ta);
       tr.appendChild(td);
@@ -278,19 +309,15 @@ function attachAutoSave(wrapper) {
     const tr = td.closest("tr");
     const table = td.closest("table");
 
-    // Typing indicator
     updateUserActivity({
       tableId: table.id,
       row: tr.rowIndex - 1,
       col: td.cellIndex - 3,
       field: e.target.tagName === "TEXTAREA" ? "comment" : "checkbox"
     });
+
     clearTimeout(typingTimeout);
     typingTimeout = setTimeout(() => updateUserActivity(null), 2000);
-
-    if (e.target.matches("textarea")) {
-      td.classList.toggle("has-comment", e.target.value.trim() !== "");
-    }
 
     saveTables();
   });
@@ -336,7 +363,10 @@ function saveTables() {
   isLocalEdit = true;
 
   const tables = [...document.querySelectorAll(".table-wrapper")].map(wrapper => ({
-    date: wrapper.querySelector("input[type='date']")?.value || "",
+    date: {
+  start: wrapper.querySelector("input[type='date']:first-of-type")?.value || "",
+  end: wrapper.querySelector("input[type='date']:last-of-type")?.value || ""
+},
     rows: [...wrapper.querySelectorAll("tbody tr")].map(tr => ({
       checkboxes: [...tr.querySelectorAll("input[type='checkbox']")].map(cb => cb.checked),
       comments: [...tr.querySelectorAll("textarea")].map(ta => ta.value)
@@ -401,8 +431,139 @@ async function initApp() {
 document.addEventListener("DOMContentLoaded", initApp);
 
 // =======================
-// CLEANUP
+// BUTTON ACTIONS
 // =======================
-window.addEventListener("beforeunload", () => {
-  if (SESSION_ID) db.ref(`presence/${SESSION_ID}`).remove();
+document.getElementById("addTableBtn")?.addEventListener("click", () => {
+  const container = document.getElementById("tablesContainer");
+  generateTable(container);
+  saveTables();
+});
+
+document.getElementById("saveTablesBtn")?.addEventListener("click", () => {
+  saveTables();
+  alert("Tables saved successfully!");
+});
+
+// =======================
+// CLICK OUTSIDE TO HIDE COMMENT
+// =======================
+document.addEventListener("click", (e) => {
+  document.querySelectorAll(".comment-box").forEach(ta => {
+    const td = ta.closest("td");
+    if (ta.style.display === "block" && !td.contains(e.target)) {
+      ta.style.display = "none";
+    }
+  });
+});
+
+function showGraph(table) {
+  const modal = document.getElementById("graphModal");
+  const canvas = document.getElementById("graphCanvas");
+  if (!canvas) return;
+  const ctx = canvas.getContext("2d");
+
+  // Destroy previous chart instance if exists
+  if (window.graphChart) window.graphChart.destroy();
+
+  // Errors per Dev
+  const devNames = [...table.querySelectorAll("tbody tr td:nth-child(2)")].map(td => td.textContent);
+  const devErrors = [...table.querySelectorAll("tbody tr td.errors")].map(td => parseInt(td.textContent));
+
+  // Errors per Concern (column totals)
+  const concernErrors = [...table.querySelectorAll(".column-total")].map(td => parseInt(td.textContent));
+
+  // Resize canvas
+  canvas.width = canvas.clientWidth;
+  canvas.height = canvas.clientHeight;
+
+  window.graphChart = new Chart(ctx, {
+  type: "bar",
+  data: {
+    labels: devNames,
+    datasets: [
+      {
+        label: "Errors per Developer",
+        data: devErrors,
+        backgroundColor: "rgba(255, 99, 132, 0.6)",
+        borderColor: "rgba(255, 99, 132, 1)",
+        borderWidth: 1,
+        borderRadius: 5,
+        yAxisID: 'y1',
+        hoverBackgroundColor: "rgba(255, 99, 132, 0.9)"
+      },
+      {
+        label: "Errors per Concern (Overall)",
+        data: concernErrors,
+        backgroundColor: "rgba(54, 162, 235, 0.6)",
+        borderColor: "rgba(54, 162, 235, 1)",
+        borderWidth: 1,
+        borderRadius: 5,
+        yAxisID: 'y2',
+        hoverBackgroundColor: "rgba(54, 162, 235, 0.9)"
+      }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { 
+        position: "top", 
+        labels: { boxWidth: 20, padding: 15, color: "#000" }  // black legend labels
+      },
+      title: { 
+        display: true, 
+        text: "Developer Errors & Overall Concern Errors",
+        font: { size: 18 },
+        color: "#000" // black title
+      },
+      tooltip: {
+        enabled: true,
+        mode: 'index',
+        intersect: false,
+        callbacks: {
+          label: function(context) {
+            return `${context.dataset.label}: ${context.parsed.y}`;
+          }
+        }
+      }
+    },
+    interaction: {
+      mode: 'nearest',
+      axis: 'x',
+      intersect: false
+    },
+    scales: {
+      x: {
+        ticks: {
+          maxRotation: 60,   // rotate longer names
+          minRotation: 45,
+          autoSkip: false,
+          color: "#000",      // black font for developer names
+          font: { size: 12 }  // adjust font size if needed
+        },
+        grid: { display: false }
+      },
+      y1: {
+        beginAtZero: true,
+        position: 'left',
+        title: { display: true, text: 'Errors per Dev', color: '#000' },
+        grid: { color: 'rgba(200,200,200,0.2)' },
+        ticks: { stepSize: 1, color: '#000' }
+      },
+      y2: {
+        beginAtZero: true,
+        position: 'right',
+        title: { display: true, text: 'Errors per Concern', color: '#000' },
+        grid: { drawOnChartArea: false },
+        ticks: { stepSize: 1, color: '#000' }
+      }
+    }
+  }
+});
+  modal.style.display = "flex";
+}
+// Close modal
+document.getElementById("closeGraphModal").addEventListener("click", () => {
+  document.getElementById("graphModal").style.display = "none";
 });

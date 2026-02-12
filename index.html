@@ -170,11 +170,11 @@
       })
       .catch(error => alert(error.message));
   }
+ // auto-redirect if already logged in
+if (sessionStorage.getItem("loggedIn") === "true") {
+  location.replace("Main.html");
+}
 
-  // auto-redirect if already logged in
-  if (sessionStorage.getItem("loggedIn") === "true") {
-    location.replace("Main.html");
-  }
 </script>
 
 </body>

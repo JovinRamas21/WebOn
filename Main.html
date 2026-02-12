@@ -7,7 +7,6 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-
 <header class="app-header">
   <h2>Dev Concerns Checklist</h2>
 
@@ -29,7 +28,15 @@
 
 <main id="tablesContainer"></main>
 
+<div id="graphModal">
+  <div id="graphModalContent">
+    <span id="closeGraphModal">&times;</span>
+    <canvas id="graphCanvas"></canvas>
+  </div>
+</div>
+
 <!-- Firebase (compat) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
