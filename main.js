@@ -45,34 +45,6 @@ function getUserColor() {
 }
 const USER_COLOR = getUserColor();
 
-async function handleLogin(email, password) {
-  try {
-    const userCredential = await auth.signInWithEmailAndPassword(email, password);
-    const user = userCredential.user;
-
-   const safeEmailKey = btoa(email.toLowerCase());
-const emailRef = db.ref("presenceByEmail/" + safeEmailKey);
-const snap = await emailRef.get();
-
-if (snap.exists()) {
-   alert("Already logged in.");
-   await auth.signOut();
-   return;
-}
-
-await emailRef.set(SESSION_ID);
-emailRef.onDisconnect().remove();
-
-    // ✅ Allow login
-    sessionStorage.setItem("loggedIn", "true");
-    sessionStorage.setItem("email", email);
-
-    window.location.href = "Main.html";
-
-  } catch (error) {
-    alert(error.message);
-  }
-}
 // =======================
 // DATA
 // =======================
@@ -121,10 +93,10 @@ function initPresence() {
   presenceRef.onDisconnect().remove();
 
   presenceRef.set({
-  email,
-  onlineAt: firebase.database.ServerValue.TIMESTAMP,
-  activity: null
-});
+    email,
+    onlineAt: Date.now(),
+    activity: null
+  });
 
   console.log("Presence initialized with ID:", SESSION_ID);
 
@@ -625,19 +597,18 @@ document.getElementById("closeGraphModal").addEventListener("click", () => {
 // =======================
 document.getElementById("logoutBtn")?.addEventListener("click", async () => {
   try {
-    const email = sessionStorage.getItem("email");
-    const safeEmailKey = btoa(email.toLowerCase());
-
-    // Remove presence session
+    // Remove presence
     if (SESSION_ID) {
       await db.ref(`presence/${SESSION_ID}`).remove();
     }
 
-    // Remove email lock
-    await db.ref(`presenceByEmail/${safeEmailKey}`).remove();
-
+    // Firebase sign out
     await auth.signOut();
+
+    // Clear session
     sessionStorage.clear();
+
+    // Redirect to login
     window.location.href = "index.html";
 
   } catch (error) {
