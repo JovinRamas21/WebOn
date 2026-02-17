@@ -45,6 +45,34 @@ function getUserColor() {
 }
 const USER_COLOR = getUserColor();
 
+async function handleLogin(email, password) {
+  try {
+    const userCredential = await auth.signInWithEmailAndPassword(email, password);
+    const user = userCredential.user;
+
+   const safeEmailKey = btoa(email.toLowerCase());
+const emailRef = db.ref("presenceByEmail/" + safeEmailKey);
+const snap = await emailRef.get();
+
+if (snap.exists()) {
+   alert("Already logged in.");
+   await auth.signOut();
+   return;
+}
+
+await emailRef.set(SESSION_ID);
+emailRef.onDisconnect().remove();
+
+    // ✅ Allow login
+    sessionStorage.setItem("loggedIn", "true");
+    sessionStorage.setItem("email", email);
+
+    window.location.href = "Main.html";
+
+  } catch (error) {
+    alert(error.message);
+  }
+}
 // =======================
 // DATA
 // =======================
@@ -93,10 +121,10 @@ function initPresence() {
   presenceRef.onDisconnect().remove();
 
   presenceRef.set({
-    email,
-    onlineAt: Date.now(),
-    activity: null
-  });
+  email,
+  onlineAt: firebase.database.ServerValue.TIMESTAMP,
+  activity: null
+});
 
   console.log("Presence initialized with ID:", SESSION_ID);
 
@@ -206,8 +234,9 @@ function generateTable(containerId, savedData = null) {
   deleteBtn.textContent = "Delete Table";
   deleteBtn.className = "btn btn-danger";
 
-  // Table hidden by default
-  table.style.display = "none";
+const savedVisible = savedData?.visible ?? false;
+table.style.display = savedVisible ? "" : "none";
+toggleBtn.textContent = savedVisible ? "Hide Table" : "Show Table";
 
   // Button functionality
   toggleBtn.addEventListener("click", () => {
@@ -403,21 +432,26 @@ function saveTables() {
   if (isApplyingRemote) return;
   isLocalEdit = true;
 
-  const tables = [...document.querySelectorAll(".table-wrapper")].map(wrapper => ({
+  const tables = [...document.querySelectorAll(".table-wrapper")].map(wrapper => {
+  const table = wrapper.querySelector("table");
+
+  return {
+    visible: table.style.display !== "none", // 👈 SAVE VISIBILITY
     date: {
-  start: wrapper.querySelector("input[type='date']:first-of-type")?.value || "",
-  end: wrapper.querySelector("input[type='date']:last-of-type")?.value || ""
-},
+      start: wrapper.querySelector("input[type='date']:first-of-type")?.value || "",
+      end: wrapper.querySelector("input[type='date']:last-of-type")?.value || ""
+    },
     rows: [...wrapper.querySelectorAll("tbody tr")].map(tr => ({
       checkboxes: [...tr.querySelectorAll("input[type='checkbox']")].map(cb => cb.checked),
       comments: [...tr.querySelectorAll("textarea")].map(ta => ta.value)
     }))
-  }));
+  };
+});
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(tables));
   db.ref(CLOUD_DOC).set({ updatedAt: firebase.database.ServerValue.TIMESTAMP, tables }).catch(console.error);
 
-  setTimeout(() => (isLocalEdit = false), 300);
+  setTimeout(() => (isLocalEdit = false), 1500);
 }
 
 async function loadFromCloud() {
@@ -507,110 +541,106 @@ function showGraph(table) {
   const modal = document.getElementById("graphModal");
   const canvas = document.getElementById("graphCanvas");
   if (!canvas) return;
+
   const ctx = canvas.getContext("2d");
 
-  // Destroy previous chart instance if exists
+  // Destroy previous chart
   if (window.graphChart) window.graphChart.destroy();
 
-  // Errors per Dev
-  const devNames = [...table.querySelectorAll("tbody tr td:nth-child(2)")].map(td => td.textContent);
-  const devErrors = [...table.querySelectorAll("tbody tr td.errors")].map(td => parseInt(td.textContent));
+  // ===== GET CONCERN LABELS =====
+  const concernLabels = [...table.querySelectorAll("thead tr:nth-child(2) th")]
+    .map(th => th.textContent);
 
-  // Errors per Concern (column totals)
-  const concernErrors = [...table.querySelectorAll(".column-total")].map(td => parseInt(td.textContent));
+  // ===== GET HOW MANY DEVS HAVE EACH ERROR =====
+  const concernTotals = [...table.querySelectorAll(".column-total")]
+    .map(td => parseInt(td.textContent));
 
-  // Resize canvas
+  // Resize canvas properly
   canvas.width = canvas.clientWidth;
   canvas.height = canvas.clientHeight;
 
   window.graphChart = new Chart(ctx, {
-  type: "bar",
-  data: {
-    labels: devNames,
-    datasets: [
-      {
-        label: "Errors per Developer",
-        data: devErrors,
-        backgroundColor: "rgba(255, 99, 132, 0.6)",
-        borderColor: "rgba(255, 99, 132, 1)",
-        borderWidth: 1,
-        borderRadius: 5,
-        yAxisID: 'y1',
-        hoverBackgroundColor: "rgba(255, 99, 132, 0.9)"
-      },
-      {
-        label: "Errors per Concern (Overall)",
-        data: concernErrors,
-        backgroundColor: "rgba(54, 162, 235, 0.6)",
+    type: "bar",
+    data: {
+      labels: concernLabels,
+      datasets: [{
+        label: "Number of Developers with this Concern",
+        data: concernTotals,
+        backgroundColor: "rgba(54, 162, 235, 0.7)",
         borderColor: "rgba(54, 162, 235, 1)",
         borderWidth: 1,
-        borderRadius: 5,
-        yAxisID: 'y2',
-        hoverBackgroundColor: "rgba(54, 162, 235, 0.9)"
-      }
-    ]
-  },
-  options: {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { 
-        position: "top", 
-        labels: { boxWidth: 20, padding: 15, color: "#000" }  // black legend labels
+        borderRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          labels: { color: "#000" }
+        },
+        title: {
+          display: true,
+          text: "Developers Affected Per Concern",
+          font: { size: 18 },
+          color: "#000"
+        }
       },
-      title: { 
-        display: true, 
-        text: "Developer Errors & Overall Concern Errors",
-        font: { size: 18 },
-        color: "#000" // black title
-      },
-      tooltip: {
-        enabled: true,
-        mode: 'index',
-        intersect: false,
-        callbacks: {
-          label: function(context) {
-            return `${context.dataset.label}: ${context.parsed.y}`;
+      scales: {
+        x: {
+          ticks: {
+            maxRotation: 60,
+            minRotation: 45,
+            autoSkip: false,
+            color: "#000",
+            font: { size: 11 }
+          },
+          grid: { display: false }
+        },
+        y: {
+          beginAtZero: true,
+          ticks: {
+            stepSize: 1,
+            color: "#000"
+          },
+          title: {
+            display: true,
+            text: "Number of Developers",
+            color: "#000"
           }
         }
       }
-    },
-    interaction: {
-      mode: 'nearest',
-      axis: 'x',
-      intersect: false
-    },
-    scales: {
-      x: {
-        ticks: {
-          maxRotation: 60,   // rotate longer names
-          minRotation: 45,
-          autoSkip: false,
-          color: "#000",      // black font for developer names
-          font: { size: 12 }  // adjust font size if needed
-        },
-        grid: { display: false }
-      },
-      y1: {
-        beginAtZero: true,
-        position: 'left',
-        title: { display: true, text: 'Errors per Dev', color: '#000' },
-        grid: { color: 'rgba(200,200,200,0.2)' },
-        ticks: { stepSize: 1, color: '#000' }
-      },
-      y2: {
-        beginAtZero: true,
-        position: 'right',
-        title: { display: true, text: 'Errors per Concern', color: '#000' },
-        grid: { drawOnChartArea: false },
-        ticks: { stepSize: 1, color: '#000' }
-      }
     }
-  }
-});
+  });
+
   modal.style.display = "flex";
 }
+
 // Close modal
 document.getElementById("closeGraphModal").addEventListener("click", () => {
   document.getElementById("graphModal").style.display = "none";
+});
+// =======================
+// LOGOUT BUTTON
+// =======================
+document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+  try {
+    const email = sessionStorage.getItem("email");
+    const safeEmailKey = btoa(email.toLowerCase());
+
+    // Remove presence session
+    if (SESSION_ID) {
+      await db.ref(`presence/${SESSION_ID}`).remove();
+    }
+
+    // Remove email lock
+    await db.ref(`presenceByEmail/${safeEmailKey}`).remove();
+
+    await auth.signOut();
+    sessionStorage.clear();
+    window.location.href = "index.html";
+
+  } catch (error) {
+    console.error("Logout error:", error);
+  }
 });

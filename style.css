@@ -298,3 +298,26 @@ tfoot td {
   color: #ff0000;
   transform: scale(1.2);
 }
+/* ===== Logout Button ===== */
+.logout-btn {
+  width: 100%;
+  margin-top: 12px;
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: bold;
+  background: #ff4d4d;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.logout-btn:hover {
+  background: #e60000;
+  transform: scale(1.03);
+}
+
+.logout-btn:active {
+  transform: scale(0.95);
+}
